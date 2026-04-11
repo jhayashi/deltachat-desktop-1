@@ -165,6 +165,13 @@ export function getKeybindings(
         keyBindings: [[ctrl, 'Shift', 'F']],
       },
       {
+        title: tx('switch_between_accounts'),
+        keyBindings: [
+          ['Control', 'Alt', 'PageUp'],
+          ['Control', 'Alt', 'PageDown'],
+        ],
+      },
+      {
         title: tx('switch_between_chats'),
         keyBindings: [
           ['Alt', 'ArrowUp'],
