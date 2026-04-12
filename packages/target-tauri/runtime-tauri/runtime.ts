@@ -718,6 +718,14 @@ class TauriRuntime implements Runtime {
         account_id?: number
       ) => void)
     | undefined
+  onWebxdcRpc:
+    | ((
+        method: string,
+        accountId: number,
+        msgId: number,
+        payload?: any
+      ) => Promise<any>)
+    | undefined
   onResumeFromSleep: (() => void) | undefined
   onToggleNotifications: (() => void) | undefined
   checkMediaAccess(mediaType: MediaType): Promise<MediaAccessStatus> {

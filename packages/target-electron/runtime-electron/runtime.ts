@@ -134,6 +134,14 @@ class ElectronRuntime implements Runtime {
         account?: number
       ) => void)
     | undefined
+  onWebxdcRpc:
+    | ((
+        method: string,
+        accountId: number,
+        msgId: number,
+        payload?: any
+      ) => Promise<any>)
+    | undefined
   onOpenQrUrl: ((url: string) => void) | undefined
   onShowDialog:
     | ((kind: 'about' | 'keybindings' | 'settings') => void)

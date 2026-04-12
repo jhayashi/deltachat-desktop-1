@@ -3,7 +3,7 @@ import { readFile } from 'fs/promises'
 import { join, extname } from 'path'
 
 import { authMiddleWare } from './middlewares'
-import type { DeltaChat } from '@deltachat/jsonrpc-client'
+import type { JRPCDeltaChat } from './deltachat-rpc'
 
 // Simple mime type map for common WebXDC file types
 const MIME_TYPES: Record<string, string> = {
@@ -64,7 +64,7 @@ const WEBXDC_CSP =
   " webrtc 'block'"
 
 export function createWebxdcRouter(
-  dc: DeltaChat,
+  dc: JRPCDeltaChat,
   distDir: string
 ): Router {
   const router = Router()
