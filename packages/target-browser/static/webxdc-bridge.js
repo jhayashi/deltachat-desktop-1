@@ -57,14 +57,16 @@
     if (msg.action === 'statusUpdates' && msg.payload) {
       // Received batch of status updates
       const updates = msg.payload
+      let maxSeen = lastSerial
       for (const update of updates) {
-        if (update.max_serial !== undefined) {
-          lastSerial = update.max_serial
+        if (update.max_serial !== undefined && update.max_serial > maxSeen) {
+          maxSeen = update.max_serial
         }
         if (updateCallback) {
           updateCallback(update)
         }
       }
+      lastSerial = maxSeen
       if (setUpdateListenerResolve) {
         setUpdateListenerResolve()
         setUpdateListenerResolve = null
@@ -197,12 +199,18 @@
         .concat(filters.mimeTypes || [])
         .join(',')
       element.multiple = filters.multiple || false
+      function cleanup() {
+        if (element.parentNode) document.body.removeChild(element)
+      }
       var promise = new Promise(function (resolve) {
         element.onchange = function () {
-          var files = Array.from(element.files || [])
-          document.body.removeChild(element)
-          resolve(files)
+          cleanup()
+          resolve(Array.from(element.files || []))
         }
+        element.addEventListener('cancel', function () {
+          cleanup()
+          resolve([])
+        })
       })
       element.style.display = 'none'
       document.body.appendChild(element)

@@ -221,11 +221,13 @@ window.__webxdc_setup = {
 <script>${bridge}</script>`
 
         let html = blob.toString('utf-8')
-        // Insert before </html> or append to end
-        if (html.includes('</html>')) {
-          html = html.replace('</html>', setupScript + '\n</html>')
+        // Insert before </head> so bridge runs before the app's own scripts
+        if (html.includes('</head>')) {
+          html = html.replace('</head>', setupScript + '\n</head>')
+        } else if (html.includes('<body')) {
+          html = html.replace(/<body[^>]*>/, match => match + '\n' + setupScript)
         } else {
-          html = html + '\n' + setupScript
+          html = setupScript + '\n' + html
         }
         res.send(html)
       } else {
