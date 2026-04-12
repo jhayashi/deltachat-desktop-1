@@ -29,6 +29,7 @@ import {
 } from './config'
 import { startDeltaChat } from './deltachat-rpc'
 import { helpRoute } from './help'
+import { createWebxdcRouter } from './webxdc-routes'
 import {
   cleanupLogFolder,
   createLogHandler,
@@ -202,6 +203,7 @@ app.use('/background', express.static(join(DATA_DIR, 'background')))
 
 app.use('/backend-api', BackendApiRoute)
 app.use(helpRoute)
+app.use('/webxdc', createWebxdcRouter(dc, DIST_DIR))
 
 app.get('/themes.json', async (_req, res) => {
   res.json(await readThemeDir())
