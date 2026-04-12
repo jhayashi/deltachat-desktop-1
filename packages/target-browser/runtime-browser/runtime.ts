@@ -85,6 +85,10 @@ class BrowserDeltachat extends BaseDeltaChat<BrowserTransport> {
 class BrowserRuntime implements Runtime {
   socket: WebSocket
   private rc_config: RC_Config | null = null
+  private webxdcInstances: Map<
+    string,
+    { channel: BroadcastChannel; window: Window | null }
+  > = new Map()
   constructor() {
     this.socket = new WebSocket(new URL('ws/backend', baseWsUrl).href)
 
@@ -140,6 +144,14 @@ class BrowserRuntime implements Runtime {
         text: string | null
       ) => void)
     | undefined
+  onWebxdcRpc:
+    | ((
+        method: string,
+        accountId: number,
+        msgId: number,
+        payload?: any
+      ) => Promise<any>)
+    | undefined
   onThemeUpdate: (() => void) | undefined //!!!TODO!!!
 
   // not used in browser, there is no menu to trigger these
@@ -155,8 +167,8 @@ class BrowserRuntime implements Runtime {
 
   // #endregion
 
-  openMapsWebxdc(_accountId: number, _chatId?: number | undefined): void {
-    throw new Error('Method not implemented.')
+  openMapsWebxdc(accountId: number, chatId?: number): void {
+    this.log.warn('openMapsWebxdc is not yet fully supported in browser target')
   }
 
   emitUIFullyReady(): void {
@@ -188,24 +200,71 @@ class BrowserRuntime implements Runtime {
   ): void {
     throw new Error('Method not implemented.')
   }
-  notifyWebxdcStatusUpdate(_accountId: number, _instanceId: number): void {
-    this.log.critical('Method not implemented.')
+  notifyWebxdcStatusUpdate(accountId: number, instanceId: number): void {
+    const key = `${accountId}.${instanceId}`
+    const instance = this.webxdcInstances.get(key)
+    if (instance) {
+      instance.channel.postMessage({
+        direction: 'toWebxdc',
+        action: 'statusUpdate',
+      })
+    }
   }
+
   notifyWebxdcRealtimeData(
-    _accountId: number,
-    _instanceId: number,
-    _payload: number[]
+    accountId: number,
+    instanceId: number,
+    payload: number[]
   ): void {
-    this.log.critical('Method not implemented.')
+    const key = `${accountId}.${instanceId}`
+    const instance = this.webxdcInstances.get(key)
+    if (instance) {
+      instance.channel.postMessage({
+        direction: 'toWebxdc',
+        action: 'realtimeData',
+        payload,
+      })
+    }
   }
-  notifyWebxdcMessageChanged(_accountId: number, _instanceId: number): void {
-    this.log.critical('Method not implemented.')
+
+  notifyWebxdcMessageChanged(accountId: number, instanceId: number): void {
+    const key = `${accountId}.${instanceId}`
+    const instance = this.webxdcInstances.get(key)
+    if (instance) {
+      instance.channel.postMessage({
+        direction: 'toWebxdc',
+        action: 'messageChanged',
+      })
+    }
   }
+
   notifyWebxdcInstanceDeleted(
-    _accountId: number,
-    _instanceId: number | null
+    accountId: number,
+    instanceId: number | null
   ): void {
-    this.log.critical('Method not implemented.')
+    if (instanceId === null) {
+      for (const [key, instance] of this.webxdcInstances) {
+        if (key.startsWith(`${accountId}.`)) {
+          instance.channel.postMessage({
+            direction: 'toWebxdc',
+            action: 'close',
+          })
+          instance.channel.close()
+          this.webxdcInstances.delete(key)
+        }
+      }
+    } else {
+      const key = `${accountId}.${instanceId}`
+      const instance = this.webxdcInstances.get(key)
+      if (instance) {
+        instance.channel.postMessage({
+          direction: 'toWebxdc',
+          action: 'close',
+        })
+        instance.channel.close()
+        this.webxdcInstances.delete(key)
+      }
+    }
   }
   startOutgoingVideoCall(): void {
     this.log.critical('Method not implemented.')
@@ -502,7 +561,14 @@ class BrowserRuntime implements Runtime {
     return Promise.resolve()
   }
   closeAllWebxdcInstances(): void {
-    this.log.critical('Method not implemented.')
+    for (const [key, instance] of this.webxdcInstances) {
+      instance.channel.postMessage({
+        direction: 'toWebxdc',
+        action: 'close',
+      })
+      instance.channel.close()
+    }
+    this.webxdcInstances.clear()
   }
   restartApp(): void {
     this.log.critical('Method not implemented.')
@@ -525,12 +591,109 @@ class BrowserRuntime implements Runtime {
     }
     return config
   }
-  getWebxdcIconURL(_accountId: number, _msgId: number): string {
-    this.log.critical('getWebxdcIconURL Method not implemented.')
-    return 'not-implemented'
+  getWebxdcIconURL(accountId: number, msgId: number): string {
+    return `/webxdc/${accountId}/${msgId}/icon`
   }
-  openWebxdc(_msgId: number, _params: DcOpenWebxdcParameters): void {
-    throw new Error('Method not implemented.')
+
+  openWebxdc(msgId: number, params: DcOpenWebxdcParameters): void {
+    const key = `${params.accountId}.${msgId}`
+    const existing = this.webxdcInstances.get(key)
+    if (existing?.window && !existing.window.closed) {
+      existing.window.focus()
+      return
+    }
+
+    const channelName = `webxdc-${params.accountId}-${msgId}`
+    const channel = new BroadcastChannel(channelName)
+    const chatNameParam = encodeURIComponent(params.chatName)
+    const displayNameParam = encodeURIComponent(params.displayname || '')
+    const win = window.open(
+      `/webxdc/${params.accountId}/${msgId}?chatName=${chatNameParam}&displayName=${displayNameParam}`,
+      `webxdc-${params.accountId}-${msgId}`
+    )
+
+    this.webxdcInstances.set(key, { channel, window: win })
+
+    channel.addEventListener('message', async (event: MessageEvent) => {
+      const msg = event.data
+      if (!msg || msg.direction !== 'toMain') return
+
+      try {
+        switch (msg.action) {
+          case 'setUpdateListener':
+          case 'getUpdates': {
+            const serial =
+              msg.action === 'setUpdateListener'
+                ? msg.payload.startSerial
+                : msg.payload.lastSerial
+            const updatesJson = await this.onWebxdcRpc?.(
+              'getWebxdcStatusUpdates',
+              params.accountId,
+              msgId,
+              serial
+            )
+            if (updatesJson) {
+              const updates = JSON.parse(updatesJson)
+              channel.postMessage({
+                direction: 'toWebxdc',
+                action: 'statusUpdates',
+                payload: updates,
+              })
+            }
+            break
+          }
+          case 'sendUpdate': {
+            await this.onWebxdcRpc?.(
+              'sendWebxdcStatusUpdate',
+              params.accountId,
+              msgId,
+              msg.payload
+            )
+            break
+          }
+          case 'joinRealtimeChannel': {
+            await this.onWebxdcRpc?.(
+              'sendWebxdcRealtimeAdvertisement',
+              params.accountId,
+              msgId
+            )
+            break
+          }
+          case 'realtimeSend': {
+            await this.onWebxdcRpc?.(
+              'sendWebxdcRealtimeData',
+              params.accountId,
+              msgId,
+              msg.payload
+            )
+            break
+          }
+          case 'realtimeLeave': {
+            await this.onWebxdcRpc?.(
+              'leaveWebxdcRealtime',
+              params.accountId,
+              msgId
+            )
+            break
+          }
+          case 'sendToChat': {
+            this.onWebxdcSendToChat?.(
+              msg.payload.file,
+              msg.payload.text,
+              params.accountId
+            )
+            break
+          }
+          case 'tabClosed': {
+            channel.close()
+            this.webxdcInstances.delete(key)
+            break
+          }
+        }
+      } catch (error) {
+        this.log.error('WebXDC BroadcastChannel handler error:', error)
+      }
+    })
   }
   async openPath(path: string): Promise<string> {
     if (path.includes('dc.db-blobs')) {
