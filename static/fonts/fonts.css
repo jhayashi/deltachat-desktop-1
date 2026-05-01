@@ -38,13 +38,13 @@
   src: url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
 }
 @font-face {
-  font-family: "Twemoji Mozilla";
-  src: url("twemoji/Twemoji.Mozilla.ttf") format("truetype");
+  font-family: "OpenMoji";
+  src: url("openmoji/OpenMoji-color-colr0_svg.woff2") format("woff2");
 }
 /* make emoji mart use the same emoji fonts in the same order that we use elsewhere */
 @font-face {
   font-family: 'EmojiMart';
   src: local('Apple Color Emoji'),
-       url("twemoji/Twemoji.Mozilla.ttf") format("truetype"),
+       url("openmoji/OpenMoji-color-colr0_svg.woff2") format("woff2"),
        url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
 }
