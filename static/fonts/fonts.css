@@ -37,18 +37,18 @@
   font-family: "NotoEmoji";
   src: url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
 }
-/* Twemoji v15.1.0 (Unicode 15.1) — community SVGinOT build from
-   13rac1/twemoji-color-font. Chromium/Blink renders SVGinOT
-   correctly in modern versions; Firefox always has. Falls through
-   to NotoEmoji if anything goes wrong. */
+/* Modern COLRv1 vector version of Noto Color Emoji from Google Fonts.
+   The bundled `noto/emoji/NotoColorEmoji.ttf` above is the older
+   CBDT bitmap version from 2022 — kept as a fallback in case the
+   COLRv1 version doesn't load for some reason. */
 @font-face {
-  font-family: "Twemoji";
-  src: url("twemoji/TwitterColorEmoji-SVGinOT.ttf") format("truetype");
+  font-family: "Noto Color Emoji";
+  src: url("noto-color-emoji/NotoColorEmoji.ttf") format("truetype");
 }
 /* make emoji mart use the same emoji fonts in the same order that we use elsewhere */
 @font-face {
   font-family: 'EmojiMart';
   src: local('Apple Color Emoji'),
-       url("twemoji/TwitterColorEmoji-SVGinOT.ttf") format("truetype"),
+       url("noto-color-emoji/NotoColorEmoji.ttf") format("truetype"),
        url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
 }
