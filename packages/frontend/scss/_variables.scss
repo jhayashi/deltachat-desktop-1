@@ -1,10 +1,10 @@
 :root {
   /* 'EmojiMart' represents the general emoji font of the app, themes may redefine it.
-     'OpenMoji' is the COLR color font we ship in static/fonts/openmoji/; it sits
-     ahead of NotoEmoji so reactions, message bodies, and other inline emoji get
-     OpenMoji's cleaner flat-design glyphs instead of NotoColorEmoji's dated
-     rendering. 'Apple Color Emoji' wins on macOS via local() lookup. */
-  --emojifonts: 'EmojiMart', 'Apple Color Emoji', 'OpenMoji', NotoEmoji;
+     'Noto Color Emoji' is the COLRv1 vector version from Google Fonts — modern
+     flat aesthetic, scales cleanly. The legacy 'NotoEmoji' (CBDT bitmap) stays
+     as a fallback. 'Apple Color Emoji' wins on macOS via local() lookup. */
+  --emojifonts:
+    'EmojiMart', 'Apple Color Emoji', 'Noto Color Emoji', NotoEmoji;
 
   --fonts-default:
     Roboto, var(--emojifonts), 'Helvetica Neue', Arial, Helvetica, NotoMono,
