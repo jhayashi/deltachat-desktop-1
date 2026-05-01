@@ -26,14 +26,17 @@ export function parseElements(
   return linkify.tokenize(message).map(element => {
     if (element.t === 'botcommand') {
       if (options.suppressBotCommands) {
-        element.t = 'text'
-        return element
+        // Shallow-copy rather than mutate — linkifyjs allocates fresh
+        // tokens per call today, but a future memoization layer (or a
+        // caller that shares tokens) would be quietly broken by an
+        // in-place rewrite.
+        return { ...element, t: 'text' } as linkify.MultiToken
       }
       const start = element.startIndex()
       // do not render botcommands if they
       // not start at index 0 or after a space
       if (start > 0 && !/\s/.test(message[start - 1])) {
-        element.t = 'text'
+        return { ...element, t: 'text' } as linkify.MultiToken
       }
     }
     // here we could also disable email links in fediverse mentions

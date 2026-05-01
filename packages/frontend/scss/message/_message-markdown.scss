@@ -4,8 +4,27 @@
 // themes target the same class names predictably. Keep the `mm-` prefix
 // to avoid colliding with global utility classes.
 
+// Paragraph block — separates consecutive paragraphs (`\n\n` in the
+// source) without inheriting the user-agent <p> margins, which look
+// wrong in a chat bubble. The walker emits one of these per markdown
+// paragraph; the empty space between adjacent paragraphs comes from the
+// margin-block-start on every paragraph past the first.
+.mm-paragraph {
+  margin-block: 0;
+
+  & + & {
+    margin-block-start: 0.6em;
+  }
+}
+
+// Platform monospace stack — bare `monospace` falls back to Courier on
+// Windows/macOS, which looks dated. The stack picks the modern system
+// monospace where available.
+$mm-mono:
+  ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono',
+  monospace;
+
 .mm-code {
-  display: block;
   white-space: pre;
   padding: 8px;
   border-radius: 8px;
@@ -13,13 +32,13 @@
   color: var(--codeBlockFg);
   overflow-x: auto;
   max-height: 400px;
-  font-family: monospace;
+  font-family: $mm-mono;
   font-size: 0.95em;
   margin-block: 4px;
 }
 
 .mm-inline-code {
-  font-family: monospace;
+  font-family: $mm-mono;
   padding: 0 4px;
   border-radius: 4px;
   background: var(--inlineCodeBg);

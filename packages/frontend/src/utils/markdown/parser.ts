@@ -63,11 +63,9 @@ export const fullParser: MarkdownIt = new MarkdownIt(COMMON_OPTIONS).disable(
 
 /**
  * Inline-only config: bold, italic, strikethrough, inline code. No fenced
- * code blocks, no tables. Reserved for surfaces where block-level structure
- * looks bad (e.g. cramped quotes, if we change our minds on quote scope).
- *
- * Currently unused at call sites — kept exported so a future surface can
- * opt in without round-tripping through the parser config story.
+ * code blocks, no tables. Used for non-interactive contexts (quotes) where
+ * the container is line-clamped and a `<pre>` or `<table>` would blow out
+ * the layout.
  */
 export const inlineParser: MarkdownIt = new MarkdownIt(COMMON_OPTIONS).disable([
   ...COMMON_DISABLE,

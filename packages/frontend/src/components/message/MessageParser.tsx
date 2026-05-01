@@ -6,7 +6,7 @@ import '../../utils/linkify/plugin-bot-command/index.js'
 
 import { Link } from './Link.js'
 import { parseElements } from '../../utils/linkify/parseElements.js'
-import { fullParser } from '../../utils/markdown/parser'
+import { fullParser, inlineParser } from '../../utils/markdown/parser'
 import {
   renderMarkdown,
   TextLeafCtx as RenderToReactCtx,
@@ -197,7 +197,13 @@ export function parseAndRenderMessage(
   }
   try {
     if (options.markdownEnabled) {
-      return <>{renderMarkdown(message, fullParser, ctx, renderTextLeaf)}</>
+      // Quotes are rendered in a `-webkit-line-clamp` flex container —
+      // block-level children (<pre>, <table>) break the clamp model and
+      // visually blow out the bubble. Use the inline-only parser there
+      // so quotes can still show **bold** / *italic* / `code` formatting
+      // without dragging in fenced code or tables.
+      const parser = options.nonInteractive ? inlineParser : fullParser
+      return <>{renderMarkdown(message, parser, ctx, renderTextLeaf)}</>
     }
     return <>{renderTextLeaf(message, ctx)}</>
   } catch (error) {

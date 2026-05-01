@@ -11,6 +11,7 @@ const log = getLogger('renderer/markdown')
 // import) keeps the renderer testable under ts-node ESM, which has no
 // CSS-loader story.
 const CLS = {
+  paragraph: 'mm-paragraph',
   code: 'mm-code',
   inlineCode: 'mm-inline-code',
   tableScroll: 'mm-table-scroll',
@@ -96,12 +97,15 @@ function renderBlockTokens(
       case 'paragraph_open': {
         const close = findClose(tokens, i, 'paragraph_close')
         const inner = tokens.slice(i + 1, close)
-        // No <p> wrapper — chat bubbles inherit their own block layout and
-        // <p> margins look wrong inside a single message body.
+        // Wrap in a block-level div so consecutive paragraphs (separated
+        // by a blank line in source) render as visually distinct blocks.
+        // A bare Fragment would let two paragraphs collapse into one
+        // running line. The class carries `margin-block: 0` so we do not
+        // inherit the user-agent <p> spacing inside a chat bubble.
         out.push(
-          <React.Fragment key={key}>
-            {renderInline(inner, ctx, key + '/', false, renderText)}
-          </React.Fragment>
+          <div key={key} className={CLS.paragraph}>
+            {renderInline(inner, ctx, key + '/', renderText)}
+          </div>
         )
         i = close + 1
         break
@@ -110,8 +114,16 @@ function renderBlockTokens(
       case 'code_block': {
         // Language hint deliberately ignored — no syntax highlighting in
         // chat. If we add it later, plumb tok.info here.
+        // tabIndex makes overflow horizontally scrollable via keyboard;
+        // role=region + aria-label gives screen readers a landmark.
         out.push(
-          <pre key={key} className={CLS.code}>
+          <pre
+            key={key}
+            className={CLS.code}
+            tabIndex={0}
+            role='region'
+            aria-label='code block'
+          >
             <code>{tok.content}</code>
           </pre>
         )
@@ -122,30 +134,19 @@ function renderBlockTokens(
         const close = findClose(tokens, i, 'table_close')
         const inner = tokens.slice(i + 1, close)
         out.push(
-          <div key={key} className={CLS.tableScroll}>
+          <div
+            key={key}
+            className={CLS.tableScroll}
+            tabIndex={0}
+            role='region'
+            aria-label='table'
+          >
             <table className={CLS.table}>
               {renderTableInner(inner, ctx, key + '/', renderText)}
             </table>
           </div>
         )
         i = close + 1
-        break
-      }
-      case 'inline': {
-        // top-level inline (rare — happens when a paragraph is a single
-        // inline token without a paragraph_open wrapper)
-        out.push(
-          <React.Fragment key={key}>
-            {renderInlineChildren(
-              tok.children ?? [],
-              ctx,
-              key + '/',
-              false,
-              renderText
-            )}
-          </React.Fragment>
-        )
-        i++
         break
       }
       default: {
@@ -263,7 +264,6 @@ function renderTableCells(
         tokens.slice(i + 1, close),
         ctx,
         key + '/',
-        false,
         renderText
       )
       out.push(<Tag key={key}>{cellContents}</Tag>)
@@ -284,7 +284,6 @@ function renderInline(
   tokens: Token[],
   ctx: TextLeafCtx,
   prefix: string,
-  insideFormatting: boolean,
   renderText: RenderTextLeafFn
 ): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -297,7 +296,7 @@ function renderInline(
           tok.children ?? [],
           ctx,
           key + '/',
-          insideFormatting,
+          false,
           renderText
         )
       )

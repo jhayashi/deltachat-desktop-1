@@ -88,7 +88,7 @@ describe('markdown — full parser', () => {
     it('renders `inline` as <code> (mm-inline-code)', () => {
       const out = md('`x`')
       const code = out.find(e => e.type === 'code')
-      expect(code, 'expected a <code> element').to.exist
+      expect(code, 'expected a <code> element').to.not.equal(undefined)
       expect(code!.props.className).to.contain('mm-inline-code')
       expect(texts(out)).to.equal('x')
     })
@@ -96,8 +96,12 @@ describe('markdown — full parser', () => {
     it('renders fenced code as <pre><code>', () => {
       const out = md('```\nhello\n```')
       const pre = out.find(e => e.type === 'pre')
-      expect(pre, 'expected a <pre>').to.exist
+      expect(pre, 'expected a <pre>').to.not.equal(undefined)
       expect(pre!.props.className).to.contain('mm-code')
+      // a11y: keyboard users must be able to focus the overflow region
+      // to scroll horizontally.
+      expect(pre!.props.tabIndex).to.equal(0)
+      expect(pre!.props.role).to.equal('region')
       expect(texts(out)).to.contain('hello')
     })
 
@@ -114,12 +118,26 @@ describe('markdown — full parser', () => {
         e => e.type === 'div' && /mm-table-scroll/.test(e.props.className || '')
       )
       const table = out.find(e => e.type === 'table')
-      expect(wrapper, 'expected an mm-table-scroll wrapper div').to.exist
-      expect(table, 'expected a <table>').to.exist
+      expect(wrapper, 'expected an mm-table-scroll wrapper div').to.not.equal(undefined)
+      // a11y: keyboard scrollability for overflow.
+      expect(wrapper!.props.tabIndex).to.equal(0)
+      expect(wrapper!.props.role).to.equal('region')
+      expect(table, 'expected a <table>').to.not.equal(undefined)
       expect(types(out)).to.include('thead')
       expect(types(out)).to.include('tbody')
       expect(types(out).filter(t => t === 'th').length).to.equal(2)
       expect(types(out).filter(t => t === 'td').length).to.equal(2)
+    })
+
+    it('renders blank-line-separated paragraphs as distinct mm-paragraph blocks', () => {
+      const out = md('hello\n\nworld')
+      const paragraphs = out.filter(
+        e => e.type === 'div' && /mm-paragraph/.test(e.props.className || '')
+      )
+      expect(paragraphs.length).to.equal(2)
+      // both texts should be present
+      expect(texts(out)).to.contain('hello')
+      expect(texts(out)).to.contain('world')
     })
   })
 

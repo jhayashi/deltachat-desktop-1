@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { C } from '@deltachat/jsonrpc-client'
 import { DesktopSettingsType, RC_Config } from '../../../shared/shared-types'
 import { BackendRemote, Type } from '../backend-com'
@@ -184,16 +184,20 @@ class SettingsStore extends Store<SettingsStoreState | null> {
       value: string | number | boolean
     ) => {
       try {
-        await runtime.setDesktopSetting(key, value)
         if (key === 'messageMarkdownEnabled') {
-          // Clear the legacy key whenever the user explicitly saves the new
-          // one, so a later migration on next launch can't overwrite this
-          // explicit preference. See settings-migrations.ts.
+          // Clear the legacy key BEFORE saving the new one. If the second
+          // write fails (IPC drop on shutdown, etc.), we want the failure
+          // mode to be "user's just-toggled preference didn't persist"
+          // (recoverable: they re-toggle next launch) rather than
+          // "preference saved, legacy still set" (unrecoverable: next
+          // launch's migration overwrites the new value with the stale
+          // legacy one). See settings-migrations.ts.
           await runtime.setDesktopSetting(
             'experimentalEnableMarkdownInMessages',
             undefined
           )
         }
+        await runtime.setDesktopSetting(key, value)
         if (key === 'syncAllAccounts') {
           if (value) {
             BackendRemote.rpc.startIoForAllAccounts()
@@ -257,6 +261,16 @@ const SettingsStoreInstance = new SettingsStore(null, 'SettingsStore')
 export const useSettingsStore = () => useStore(SettingsStoreInstance)
 
 /**
+ * Module-scope subscribe wrapper so its identity is stable across
+ * renders. `useSyncExternalStore` keys its subscription on this
+ * function's reference; recreating it per-render would unsubscribe and
+ * resubscribe every time, churning the store's listener array
+ * (`Store.unsubscribe` does an `indexOf` + `splice`).
+ */
+const subscribeToSettingsStore = (cb: () => void) =>
+  SettingsStoreInstance.subscribe(cb)
+
+/**
  * Subscribe to a single boolean desktop-setting via {@link useSyncExternalStore}.
  *
  * Why not `useSettingsStore()`: `useStore` re-renders the consumer on every
@@ -271,13 +285,18 @@ export function useDesktopBoolSetting(
   key: keyof DesktopSettingsType,
   fallback: boolean
 ): boolean {
-  const subscribe = (cb: () => void) =>
-    SettingsStoreInstance.subscribe(() => cb())
-  const getSnapshot = () => {
+  // Snapshot is memoized on (key, fallback) so successive renders pass
+  // the same reference — useSyncExternalStore reads the snapshot on every
+  // render, but a stable function avoids forcing extra reconciliation.
+  const getSnapshot = useCallback(() => {
     const v = SettingsStoreInstance.getState()?.desktopSettings[key]
     return typeof v === 'boolean' ? v : fallback
-  }
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  }, [key, fallback])
+  return useSyncExternalStore(
+    subscribeToSettingsStore,
+    getSnapshot,
+    getSnapshot
+  )
 }
 
 export default SettingsStoreInstance
