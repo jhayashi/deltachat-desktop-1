@@ -191,15 +191,23 @@ class BrowserRuntime implements Runtime {
     return new BrowserDeltachat(callCounterFunction)
   }
   openMessageHTML(
-    _accountId: number,
-    _message_id: number,
+    accountId: number,
+    message_id: number,
     _isContactRequest: boolean,
     _subject: string,
     _sender: string,
     _receiveTime: string,
     _content: string
   ): void {
-    throw new Error('Method not implemented.')
+    // Open the same SPA in a new tab with a `?fullMessage=` query so
+    // the boot path can render `<FullMessageApp>` instead of the chat
+    // shell. The new tab refetches the message via JSON-RPC (rather
+    // than reading `_content` from this opener call) so the body stays
+    // out of the URL and we don't have to thread isContactRequest /
+    // subject / sender / receiveTime through the URL either — the
+    // viewer queries them itself.
+    const url = `/?fullMessage=${accountId}:${message_id}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
   notifyWebxdcStatusUpdate(accountId: number, instanceId: number): void {
     const key = `${accountId}.${instanceId}`

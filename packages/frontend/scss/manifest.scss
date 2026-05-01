@@ -49,6 +49,9 @@
 @use 'message/_status-icon';
 @use 'message/_message-calls';
 
+// "Show Full Message…" standalone tab (browser target)
+@use 'full-message/_full-message';
+
 // misc
 @use 'misc/_avatar.scss';
 @use 'misc/_context_menu.scss';
