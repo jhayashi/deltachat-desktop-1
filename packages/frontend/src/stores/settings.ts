@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { C } from '@deltachat/jsonrpc-client'
 import { DesktopSettingsType, RC_Config } from '../../../shared/shared-types'
 import { BackendRemote, Type } from '../backend-com'
@@ -5,6 +6,7 @@ import { onReady } from '../onready'
 import { runtime } from '@deltachat-desktop/runtime-interface'
 import { Store, useStore } from './store'
 import { throttledUpdateBadgeCounter } from '../system-integration/badge-counter'
+import { migrateLegacyMarkdownSetting } from './settings-migrations'
 
 export interface SettingsStoreState {
   accountId: number
@@ -140,6 +142,11 @@ class SettingsStore extends Store<SettingsStoreState | null> {
         settings['ui.mentions_enabled'] = mentionsEnabledDefaultVal
       }
 
+      await migrateLegacyMarkdownSetting(
+        desktopSettings,
+        runtime.setDesktopSetting.bind(runtime)
+      )
+
       const rc = runtime.getRC_Config()
       this.reducer.setState({
         settings,
@@ -178,6 +185,15 @@ class SettingsStore extends Store<SettingsStoreState | null> {
     ) => {
       try {
         await runtime.setDesktopSetting(key, value)
+        if (key === 'messageMarkdownEnabled') {
+          // Clear the legacy key whenever the user explicitly saves the new
+          // one, so a later migration on next launch can't overwrite this
+          // explicit preference. See settings-migrations.ts.
+          await runtime.setDesktopSetting(
+            'experimentalEnableMarkdownInMessages',
+            undefined
+          )
+        }
         if (key === 'syncAllAccounts') {
           if (value) {
             BackendRemote.rpc.startIoForAllAccounts()
@@ -239,5 +255,29 @@ onReady(() => {
 
 const SettingsStoreInstance = new SettingsStore(null, 'SettingsStore')
 export const useSettingsStore = () => useStore(SettingsStoreInstance)
+
+/**
+ * Subscribe to a single boolean desktop-setting via {@link useSyncExternalStore}.
+ *
+ * Why not `useSettingsStore()`: `useStore` re-renders the consumer on every
+ * store change. Any settings page toggle, theme switch, or notification
+ * volume change would re-render every visible message bubble. This selector
+ * variant only re-renders when the selected boolean actually flips.
+ *
+ * The default applies before settings have loaded (boot-time) so callers
+ * never observe `undefined`.
+ */
+export function useDesktopBoolSetting(
+  key: keyof DesktopSettingsType,
+  fallback: boolean
+): boolean {
+  const subscribe = (cb: () => void) =>
+    SettingsStoreInstance.subscribe(() => cb())
+  const getSnapshot = () => {
+    const v = SettingsStoreInstance.getState()?.desktopSettings[key]
+    return typeof v === 'boolean' ? v : fallback
+  }
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
 
 export default SettingsStoreInstance

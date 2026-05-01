@@ -195,6 +195,7 @@ class TauriRuntime implements Runtime {
       isMentionsEnabled: false,
       inChatSoundsVolume: 0.5,
       useSystemUIFont: false,
+      messageMarkdownEnabled: true,
     } satisfies Partial<DesktopSettingsType>
 
     const savedEntries = (await this.store.entries()).reduce(

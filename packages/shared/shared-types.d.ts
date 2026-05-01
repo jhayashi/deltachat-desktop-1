@@ -63,8 +63,20 @@ export interface DesktopSettingsType {
   syncAllAccounts: boolean
   /** @deprecated The last used file location for the save dialog is now only kept in memory and not persisted anymore between sessions. */
   lastSaveDialogLocation: string | undefined
-  /** @deprecated */
+  /**
+   * @deprecated replaced by {@linkcode messageMarkdownEnabled}.
+   * Kept on the type for the migration window so the one-shot migration in
+   * `SettingsStore.effect.load` can read the legacy value forward.
+   */
   experimentalEnableMarkdownInMessages?: boolean
+  /**
+   * Render basic markdown formatting in chat messages: bold, italic,
+   * strikethrough, inline and fenced code, and tables.
+   *
+   * Note that other Delta Chat clients (iOS, official Android) do not
+   * currently render markdown — recipients there will see the raw markup.
+   */
+  messageMarkdownEnabled: boolean
   enableWebxdcDevTools: boolean
   /** set to false to disable the confirmation dialog for loading remote content */
   HTMLEmailAskForRemoteLoadingConfirmation: boolean

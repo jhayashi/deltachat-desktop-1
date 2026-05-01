@@ -37,6 +37,11 @@ export default function ChatsAndMedia({ settingsStore }: Props) {
         label={tx('pref_enter_sends')}
         description={tx('pref_enter_sends_explain')}
       />
+      <DesktopSettingsSwitch
+        settingsKey='messageMarkdownEnabled'
+        label={tx('pref_render_markdown_in_messages')}
+        description={tx('pref_render_markdown_in_messages_explain')}
+      />
       <OutgoingMediaQuality settings={settingsStore.settings} />
       <DownloadOnDemand settings={settingsStore.settings} />
 

@@ -61,5 +61,11 @@
   },
   "edit_channel": {
     "message": "Edit Channel"
+  },
+  "pref_render_markdown_in_messages": {
+    "message": "Render markdown formatting in messages"
+  },
+  "pref_render_markdown_in_messages_explain": {
+    "message": "Format **bold**, *italic*, ~~strikethrough~~, `code`, fenced code blocks, and tables. Other Delta Chat clients may show the raw markup."
   }
 }
