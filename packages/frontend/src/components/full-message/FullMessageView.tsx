@@ -1,14 +1,29 @@
-import React, { useEffect, useState } from 'react'
-import moment from 'moment'
+import React, { useEffect } from 'react'
 
-import { BackendRemote, Type } from '../../backend-com'
-import { getLogger } from '../../../../shared/logger'
-import { renderMarkdown } from '../../utils/markdown/renderToReact'
+import {
+  renderMarkdown,
+  RenderTextLeafFn,
+  TextLeafCtx,
+} from '../../utils/markdown/renderToReact'
 import { fullParser } from '../../utils/markdown/parser'
-import { TextLeafCtx, renderTextLeaf } from '../message/MessageParser'
+import { parseElements } from '../../utils/linkify/parseElements'
 import { detectPlaintext } from './detectPlaintext'
 
-const log = getLogger('renderer/full-message-view')
+/**
+ * Props handed off from the opener tab via localStorage. The new tab
+ * never fetches anything via JSON-RPC — opening a `/ws/dc` connection
+ * would steal the chat tab's session, since the browser server only
+ * allows one active DC client at a time. See `parseFullMessageParam`
+ * in `main.tsx` for the handoff mechanism.
+ */
+export interface FullMessageViewProps {
+  isContactRequest: boolean
+  subject: string
+  sender: string
+  receiveTime: string
+  /** HTML returned by `getMessageHtml` for the message. */
+  html: string
+}
 
 /**
  * Standalone viewer for the "Show Full Message…" tab in the browser
@@ -18,85 +33,14 @@ const log = getLogger('renderer/full-message-view')
  * pipeline; for rich HTML email bodies we use a sandboxed iframe.
  */
 export function FullMessageView({
-  accountId,
-  messageId,
-}: {
-  accountId: number
-  messageId: number
-}) {
-  const [state, setState] = useState<
-    | { kind: 'loading' }
-    | { kind: 'error'; error: string }
-    | {
-        kind: 'ready'
-        message: Type.Message
-        html: string
-      }
-  >({ kind: 'loading' })
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const [message, html] = await Promise.all([
-          BackendRemote.rpc.getMessage(accountId, messageId),
-          BackendRemote.rpc.getMessageHtml(accountId, messageId),
-        ])
-        if (cancelled) return
-        if (html == null) {
-          setState({
-            kind: 'error',
-            error: 'Message has no full content available.',
-          })
-          return
-        }
-        setState({ kind: 'ready', message, html })
-      } catch (err) {
-        log.error('failed to load full message', err)
-        if (cancelled) return
-        setState({
-          kind: 'error',
-          error: err instanceof Error ? err.message : String(err),
-        })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [accountId, messageId])
-
-  // Set the document title to the subject so the browser tab shows
-  // something useful — falls back to a generic title before the
-  // message loads.
-  useEffect(() => {
-    if (state.kind === 'ready') {
-      document.title = state.message.subject || 'Full message'
-    }
-  }, [state])
-
-  if (state.kind === 'loading') {
-    return <div className='full-message-loading'>Loading…</div>
-  }
-  if (state.kind === 'error') {
-    return (
-      <div className='full-message-error' role='alert'>
-        {state.error}
-      </div>
-    )
-  }
-  return <FullMessageReady message={state.message} html={state.html} />
-}
-
-function FullMessageReady({
-  message,
+  subject,
+  sender,
+  receiveTime,
   html,
-}: {
-  message: Type.Message
-  html: string
-}) {
-  const subject = message.subject || ''
-  const sender = message.overrideSenderName || message.sender.displayName
-  const receiveTime = moment(message.receivedTimestamp * 1000).format('LLLL')
+}: FullMessageViewProps) {
+  useEffect(() => {
+    document.title = subject || 'Full message'
+  }, [subject])
 
   const detection = detectPlaintext(html)
 
@@ -121,15 +65,65 @@ function FullMessageReady({
 }
 
 /**
- * Render the unwrapped plaintext through the full markdown pipeline.
- * `tabindex: 0` so links inside the body are keyboard-focusable; the
- * leaf renderer wires linkify exactly as in the chat bubble.
+ * Standalone leaf renderer for the full-message view. Unlike the chat
+ * bubble's renderer, this one does not depend on `<ChatProvider>` /
+ * `useChat` / draft-message machinery — the standalone tab has no
+ * chat shell and no JSON-RPC connection. URLs become plain
+ * `target="_blank"` anchors; emails become `mailto:` anchors;
+ * hashtags and bot commands fall back to plain spans (interaction
+ * would route into chat state we don't have here).
+ */
+const renderFullMessageLeaf: RenderTextLeafFn = (
+  text,
+  ctx,
+  parentKey
+): React.ReactNode[] => {
+  if (ctx.suppressLinkify) {
+    return [<span key={`${parentKey}t0`}>{text}</span>]
+  }
+  const elements = parseElements(text, {
+    suppressBotCommands: ctx.suppressBotCommands,
+  })
+  return elements.map((el, i) => {
+    const key = `${parentKey}t${i}`
+    switch (el.t) {
+      case 'url': {
+        // linkify returns the matched URL text; default to https for
+        // schemeless matches. `noreferrer` strips Referer, `noopener`
+        // blocks window.opener shenanigans on the destination page.
+        const href = /^[a-z][a-z0-9+.-]*:/i.test(el.v)
+          ? el.v
+          : `https://${el.v}`
+        return (
+          <a key={key} href={href} target='_blank' rel='noreferrer noopener'>
+            {el.v}
+          </a>
+        )
+      }
+      case 'email': {
+        return (
+          <a key={key} href={`mailto:${el.v}`}>
+            {el.v}
+          </a>
+        )
+      }
+      case 'nl':
+        return <span key={key}>{'\n'}</span>
+      default:
+        return <span key={key}>{el.v}</span>
+    }
+  })
+}
+
+/**
+ * Render the unwrapped plaintext through the full markdown pipeline,
+ * using the standalone leaf renderer above.
  */
 function PlaintextBody({ text }: { text: string }) {
   const ctx: TextLeafCtx = { tabindex: 0 }
   return (
     <div className='full-message-plaintext'>
-      {renderMarkdown(text, fullParser, ctx, renderTextLeaf)}
+      {renderMarkdown(text, fullParser, ctx, renderFullMessageLeaf)}
     </div>
   )
 }
@@ -138,17 +132,10 @@ function PlaintextBody({ text }: { text: string }) {
  * Render rich HTML email content in a sandboxed iframe. The CSP meta
  * tag injected at the top of the srcdoc blocks scripts, remote
  * stylesheets, and remote images — so a hostile email body cannot
- * fetch trackers or run JS. `sandbox="allow-same-origin"` is omitted
- * deliberately: with no allow-* tokens the iframe runs as a unique
- * origin with scripts disabled, which is what we want.
+ * fetch trackers or run JS. With `sandbox=""` (no allow-* tokens)
+ * the iframe runs as a unique origin with scripts disabled.
  */
 function HtmlBody({ html }: { html: string }) {
-  // Inject a strict CSP meta at the very top so the browser sees it
-  // before any external-resource hint in the email body. `default-src
-  // 'none'` denies everything; `style-src 'unsafe-inline'` is the only
-  // concession because most email HTML uses inline `<style>` blocks
-  // (we already filtered <style> out via detectPlaintext, so any HTML
-  // that reaches here may need it).
   const csp =
     "default-src 'none'; " +
     "style-src 'unsafe-inline'; " +

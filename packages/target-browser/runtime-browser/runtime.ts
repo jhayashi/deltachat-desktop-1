@@ -191,22 +191,71 @@ class BrowserRuntime implements Runtime {
     return new BrowserDeltachat(callCounterFunction)
   }
   openMessageHTML(
-    accountId: number,
-    message_id: number,
-    _isContactRequest: boolean,
-    _subject: string,
-    _sender: string,
-    _receiveTime: string,
-    _content: string
+    _accountId: number,
+    _message_id: number,
+    isContactRequest: boolean,
+    subject: string,
+    sender: string,
+    receiveTime: string,
+    content: string
   ): void {
-    // Open the same SPA in a new tab with a `?fullMessage=` query so
-    // the boot path can render `<FullMessageApp>` instead of the chat
-    // shell. The new tab refetches the message via JSON-RPC (rather
-    // than reading `_content` from this opener call) so the body stays
-    // out of the URL and we don't have to thread isContactRequest /
-    // subject / sender / receiveTime through the URL either — the
-    // viewer queries them itself.
-    const url = `/?fullMessage=${accountId}:${message_id}`
+    // Hand the already-fetched message off to a new tab via
+    // localStorage. The new tab opens at `/?fullMessage=<token>`,
+    // reads the entry, and renders without opening a JSON-RPC
+    // connection of its own. (If we let the new tab refetch via
+    // `BackendRemote.rpc`, it would open `/ws/dc` and the browser
+    // server would kick the original tab — only one DC connection
+    // per server is allowed.)
+    //
+    // localStorage cleanup: the new tab removes its own entry on
+    // load. We also sweep entries older than the TTL on every write,
+    // so an unused (or pre-empted) handoff doesn't leak forever.
+    const TTL_MS = 60 * 60 * 1000 // 1 hour
+    const now = Date.now()
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i)
+        if (!key || !key.startsWith('fmsg:')) continue
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        try {
+          const parsed = JSON.parse(raw)
+          if (
+            typeof parsed?.savedAt !== 'number' ||
+            now - parsed.savedAt > TTL_MS
+          ) {
+            localStorage.removeItem(key)
+          }
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    } catch {
+      // localStorage may be unavailable (private mode quotas etc.).
+      // Fall through; window.open below still works, the new tab
+      // just won't find a payload and will show its expired-state.
+    }
+
+    const token =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36)
+    const payload = {
+      savedAt: now,
+      isContactRequest,
+      subject,
+      sender,
+      receiveTime,
+      html: content,
+    }
+    try {
+      localStorage.setItem(`fmsg:${token}`, JSON.stringify(payload))
+    } catch {
+      // localStorage quota or unavailable — proceed anyway, the new
+      // tab will render its expired-state.
+    }
+
+    const url = `/?fullMessage=${token}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
   notifyWebxdcStatusUpdate(accountId: number, instanceId: number): void {
