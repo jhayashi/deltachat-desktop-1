@@ -1,10 +1,9 @@
 :root {
   /* 'EmojiMart' represents the general emoji font of the app, themes may redefine it.
-     'Noto Color Emoji' is the COLRv1 vector version from Google Fonts — modern
-     flat aesthetic, scales cleanly. The legacy 'NotoEmoji' (CBDT bitmap) stays
-     as a fallback. 'Apple Color Emoji' wins on macOS via local() lookup. */
-  --emojifonts:
-    'EmojiMart', 'Apple Color Emoji', 'Noto Color Emoji', NotoEmoji;
+     'Twemoji' is the SVGinOT v15.1.0 build (Unicode 15.1) we ship in
+     static/fonts/twemoji/ — Twitter's flat colorful style. 'Apple Color Emoji'
+     wins on macOS via local() lookup. NotoEmoji is the bundled CBDT fallback. */
+  --emojifonts: 'EmojiMart', 'Apple Color Emoji', 'Twemoji', NotoEmoji;
 
   --fonts-default:
     Roboto, var(--emojifonts), 'Helvetica Neue', Arial, Helvetica, NotoMono,
