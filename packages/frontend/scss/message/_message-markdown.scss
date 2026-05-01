@@ -17,6 +17,41 @@
   }
 }
 
+// Headings — distinguished by font-style/weight only (H1–H3) or by a
+// modest size step + underline (H4–H6), never by big heading-style
+// fonts. Chat bubbles look broken with display-grade type. All six
+// share `.mm-heading` for layout (block, no user-agent margins) and
+// inherit font-size from the bubble unless explicitly stepped down.
+.mm-heading {
+  display: block;
+  margin-block: 0.4em 0.2em;
+  font-weight: normal;
+  font-size: 1em;
+  line-height: 1.3;
+}
+.mm-h1 {
+  font-weight: bold;
+  font-style: italic;
+}
+.mm-h2 {
+  font-weight: bold;
+}
+.mm-h3 {
+  font-style: italic;
+}
+.mm-h4 {
+  font-size: 0.95em;
+  text-decoration: underline;
+}
+.mm-h5 {
+  font-size: 0.9em;
+  text-decoration: underline;
+}
+.mm-h6 {
+  font-size: 0.85em;
+  text-decoration: underline;
+}
+
 // Platform monospace stack — bare `monospace` falls back to Courier on
 // Windows/macOS, which looks dated. The stack picks the modern system
 // monospace where available.
@@ -24,26 +59,41 @@ $mm-mono:
   ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono',
   monospace;
 
+// Code blocks use a left border bar (no fill, no rounded corners) so
+// monospace stands apart visually without painting a heavy block of
+// shaded background inside the bubble. Padding-inline-start gives the
+// text a small inset from the bar. The inner `<code>` resets the
+// global `code { background, padding, border-radius }` rule from
+// `_global.scss` so the fenced block doesn't double up with a dark
+// pill on its inner element.
 .mm-code {
   white-space: pre;
-  padding: 8px;
-  border-radius: 8px;
-  background: var(--codeBlockBg);
-  color: var(--codeBlockFg);
+  padding: 4px 0 4px 10px;
+  border-inline-start: 3px solid var(--codeBlockBorder);
   overflow-x: auto;
   max-height: 400px;
   font-family: $mm-mono;
   font-size: 0.95em;
   margin-block: 4px;
+
+  code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
 }
 
+// Inline code is just the monospace font — no fill, no border. The
+// font change alone is enough of a visual signal in flowing text.
+// Explicitly reset the global `code` shading from `_global.scss` so
+// markdown inline-code doesn't pick up the 25%-black pill that other
+// surfaces in the app rely on.
 .mm-inline-code {
   font-family: $mm-mono;
-  padding: 0 4px;
-  border-radius: 4px;
-  background: var(--inlineCodeBg);
-  color: var(--inlineCodeFg);
   font-size: 0.95em;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 .mm-table-scroll {
@@ -53,6 +103,9 @@ $mm-mono:
   margin-block: 4px;
 }
 
+// Tables keep hairline cell borders for readability — without them the
+// rows and columns aren't distinguishable. Header cells are bold but
+// share the bubble background.
 .mm-table {
   border-collapse: collapse;
   font-size: 0.95em;
@@ -65,7 +118,6 @@ $mm-mono:
   }
 
   th {
-    background: var(--codeBlockBg);
     font-weight: bold;
   }
 }

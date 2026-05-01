@@ -25,8 +25,6 @@ const COMMON_DISABLE = [
   'list',
   'reference',
   'html_block',
-  'heading',
-  'lheading',
   // inline rules off
   'link',
   'image',
@@ -34,7 +32,14 @@ const COMMON_DISABLE = [
   'html_inline',
 ] as const
 
-const INLINE_ONLY_EXTRA_DISABLE = ['fence', 'table'] as const
+// Headings are also block-level — keep them out of the inline parser so
+// quotes can't render an `# H1` inside the line-clamped quote box.
+const INLINE_ONLY_EXTRA_DISABLE = [
+  'fence',
+  'table',
+  'heading',
+  'lheading',
+] as const
 
 const COMMON_OPTIONS: MarkdownIt.Options = {
   // No raw HTML — escape `<b>` etc. as text. Critical: combined with our
@@ -55,7 +60,9 @@ const COMMON_OPTIONS: MarkdownIt.Options = {
 
 /**
  * Full markdown config: bold, italic, strikethrough, inline code, fenced
- * code, and tables. Used in message bodies, quotes, and profile statuses.
+ * code, tables, and ATX/Setext headings (#, ##, …). Headings render at
+ * body font-size — see _message-markdown.scss for the size-flat
+ * treatment. Used in message bodies and profile statuses (NOT quotes).
  */
 export const fullParser: MarkdownIt = new MarkdownIt(COMMON_OPTIONS).disable(
   COMMON_DISABLE as unknown as string[]

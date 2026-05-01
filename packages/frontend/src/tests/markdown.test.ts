@@ -141,9 +141,30 @@ describe('markdown — full parser', () => {
     })
   })
 
+  describe('headings render as h1..h6 with mm-heading + mm-h{N} classes', () => {
+    const cases: Array<[number, string]> = [
+      [1, '# H1'],
+      [2, '## H2'],
+      [3, '### H3'],
+      [4, '#### H4'],
+      [5, '##### H5'],
+      [6, '###### H6'],
+    ]
+    for (const [level, input] of cases) {
+      it(`renders ${input.split(' ')[0]} as <h${level}>`, () => {
+        const out = md(input)
+        const tag = `h${level}`
+        const heading = out.find(e => e.type === tag)
+        expect(heading, `expected an <${tag}>`).to.not.equal(undefined)
+        expect(heading!.props.className).to.contain('mm-heading')
+        expect(heading!.props.className).to.contain(`mm-h${level}`)
+        expect(texts(out)).to.contain(`H${level}`)
+      })
+    }
+  })
+
   describe('disabled rules pass through as plain text', () => {
     const passthrough: Array<[string, string]> = [
-      ['heading', '# H1'],
       ['list-bullet', '- item'],
       ['list-ordered', '1. item'],
       ['blockquote', '> quoted'],
@@ -158,8 +179,6 @@ describe('markdown — full parser', () => {
     for (const [name, input] of passthrough) {
       it(`${name}: ${JSON.stringify(input)}`, () => {
         const out = md(input)
-        expect(types(out)).to.not.include('h1')
-        expect(types(out)).to.not.include('h2')
         expect(types(out)).to.not.include('ul')
         expect(types(out)).to.not.include('ol')
         expect(types(out)).to.not.include('li')
@@ -247,6 +266,12 @@ describe('markdown — inline-only parser', () => {
   it('does not render tables (passes through)', () => {
     const out = mdInline('| a | b |\n|---|---|\n| 1 | 2 |')
     expect(types(out)).to.not.include('table')
+  })
+
+  it('does not render headings (passes through)', () => {
+    const out = mdInline('# heading')
+    expect(types(out)).to.not.include('h1')
+    expect(texts(out)).to.contain('# heading')
   })
 
   it('still renders bold', () => {

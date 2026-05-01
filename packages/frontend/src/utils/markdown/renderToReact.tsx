@@ -12,11 +12,18 @@ const log = getLogger('renderer/markdown')
 // CSS-loader story.
 const CLS = {
   paragraph: 'mm-paragraph',
+  heading: 'mm-heading',
   code: 'mm-code',
   inlineCode: 'mm-inline-code',
   tableScroll: 'mm-table-scroll',
   table: 'mm-table',
 } as const
+
+// Allowed heading-tag set. markdown-it's heading_open token carries
+// `tok.tag` as the string 'h1'..'h6'; this set lets us narrow safely to
+// JSX intrinsic-element names without trusting an arbitrary string.
+const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
 /**
  * Per-render context threaded through every level of the walker. The walker
@@ -106,6 +113,24 @@ function renderBlockTokens(
           <div key={key} className={CLS.paragraph}>
             {renderInline(inner, ctx, key + '/', renderText)}
           </div>
+        )
+        i = close + 1
+        break
+      }
+      case 'heading_open': {
+        const close = findClose(tokens, i, 'heading_close')
+        const inner = tokens.slice(i + 1, close)
+        // markdown-it's heading_open carries the level as `tok.tag`
+        // ('h1'..'h6'). Narrow defensively before handing to JSX so a
+        // malformed token can't render an arbitrary tag name.
+        const tagName = HEADING_TAGS.has(tok.tag)
+          ? (tok.tag as HeadingTag)
+          : 'h6'
+        const Tag = tagName
+        out.push(
+          <Tag key={key} className={`${CLS.heading} mm-${tagName}`}>
+            {renderInline(inner, ctx, key + '/', renderText)}
+          </Tag>
         )
         i = close + 1
         break
