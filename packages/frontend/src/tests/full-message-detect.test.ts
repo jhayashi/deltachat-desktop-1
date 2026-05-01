@@ -1,115 +1,107 @@
 import { expect } from 'chai'
 import { describe, it } from 'mocha'
 
-import { detectPlaintext } from '../components/full-message/detectPlaintext.js'
+import { extractPlaintext } from '../components/full-message/detectPlaintext.js'
 
-describe('detectPlaintext', () => {
-  describe('wrapped-plaintext recognition', () => {
-    it('accepts an empty string', () => {
-      const out = detectPlaintext('')
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('')
+describe('extractPlaintext (regex fallback path)', () => {
+  describe('simple wrappers', () => {
+    it('returns empty for empty input', () => {
+      expect(extractPlaintext('')).to.equal('')
     })
 
-    it('accepts a `<pre>`-wrapped body and extracts the text', () => {
+    it('extracts a `<pre>`-wrapped body', () => {
       const html =
         '<!DOCTYPE html><html><head><meta charset="utf-8"></head>' +
         '<body><pre>hello world</pre></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('hello world')
+      expect(extractPlaintext(html)).to.equal('hello world')
     })
 
-    it('accepts a `<p>`-wrapped body', () => {
-      const html = '<html><body><p>hello</p><p>world</p></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.contain('hello')
-      expect(out.text).to.contain('world')
+    it('preserves paragraph breaks for `<p>...</p><p>...</p>`', () => {
+      const html =
+        '<html><body><p># Heading</p><p>## Sub</p><p>body</p></body></html>'
+      // Each </p> maps to a paragraph break; markdown-friendly.
+      const out = extractPlaintext(html)
+      expect(out).to.contain('# Heading')
+      expect(out).to.contain('## Sub')
+      // Heading and sub must not be glued onto one line — markdown
+      // requires the # and ## to start lines.
+      const lines = out.split('\n').filter(l => l.trim().length > 0)
+      expect(lines).to.deep.equal(['# Heading', '## Sub', 'body'])
     })
 
-    it('decodes common HTML entities back to their literals', () => {
+    it('decodes common HTML entities', () => {
       const html =
         '<html><body><pre>5 &lt; 10 &amp;&amp; foo &gt; bar &quot;ok&quot;</pre></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('5 < 10 && foo > bar "ok"')
+      expect(extractPlaintext(html)).to.equal('5 < 10 && foo > bar "ok"')
     })
 
     it('decodes numeric and hex character references', () => {
       const html = '<html><body><pre>&#65; &#x42; &#x1F600;</pre></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      // U+1F600 is the grinning-face emoji.
-      expect(out.text).to.equal('A B \u{1F600}')
+      expect(extractPlaintext(html)).to.equal('A B \u{1F600}')
     })
 
-    it('converts <br> to newlines so soft breaks survive', () => {
+    it('converts <br> to newlines', () => {
       const html = '<html><body><p>line1<br>line2<br/>line3</p></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('line1\nline2\nline3')
+      expect(extractPlaintext(html)).to.contain('line1\nline2\nline3')
     })
 
-    it('drops <head> children from extracted text (no <title> bleed)', () => {
+    it('drops <head> children', () => {
       const html =
-        '<html><head><title>Subject Line</title></head>' +
+        '<html><head><title>Subject</title></head>' +
         '<body><pre>just the body</pre></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('just the body')
-      expect(out.text).to.not.contain('Subject Line')
+      const out = extractPlaintext(html)
+      expect(out).to.equal('just the body')
+      expect(out).to.not.contain('Subject')
+    })
+
+    it('drops <script> and <style> blocks', () => {
+      const html =
+        '<html><body><script>evil()</script>' +
+        '<style>.x{}</style>' +
+        '<p>safe content</p></body></html>'
+      const out = extractPlaintext(html)
+      expect(out).to.equal('safe content')
+      expect(out).to.not.contain('evil')
+      expect(out).to.not.contain('.x')
     })
 
     it('drops HTML comments', () => {
       const html =
         '<html><body><pre>before<!-- secret --> after</pre></body></html>'
-      const out = detectPlaintext(html)
-      expect(out.isPlaintext).to.equal(true)
-      expect(out.text).to.equal('before after')
+      expect(extractPlaintext(html)).to.equal('before after')
     })
   })
 
-  describe('rich HTML rejection', () => {
-    const richCases: Array<[string, string]> = [
-      [
-        '<style>',
-        '<html><body><style>p{color:red}</style><p>x</p></body></html>',
-      ],
-      [
-        '<script>',
-        '<html><body><script>alert(1)</script><p>x</p></body></html>',
-      ],
-      [
-        '<table>',
-        '<html><body><table><tr><td>a</td></tr></table></body></html>',
-      ],
-      ['<img>', '<html><body><img src="https://x"/><p>x</p></body></html>'],
-      ['<iframe>', '<html><body><iframe src="https://x"/></body></html>'],
-      ['inline style', '<html><body><p style="color:red">x</p></body></html>'],
-      ['<svg>', '<html><body><svg><circle/></svg></body></html>'],
-      ['<form>', '<html><body><form><input/></form></body></html>'],
-      [
-        '<a> link (not in allow list)',
-        '<html><body><p>see <a href="x">link</a></p></body></html>',
-      ],
-    ]
+  describe('markdown structure preserved through the extractor', () => {
+    it('keeps blank lines between paragraphs', () => {
+      // DC core's wrapping for a multi-paragraph plaintext message —
+      // the original message had `\n\n` between paragraphs.
+      const html =
+        '<html><body>' +
+        '<p># Heading</p>' +
+        '<p>**bold text**</p>' +
+        '<p>plain paragraph</p>' +
+        '</body></html>'
+      const out = extractPlaintext(html)
+      // Markdown-significant tokens must each be on their own line.
+      expect(out).to.match(/^# Heading$/m)
+      expect(out).to.match(/^\*\*bold text\*\*$/m)
+      expect(out).to.match(/^plain paragraph$/m)
+    })
 
-    for (const [name, input] of richCases) {
-      it(`rejects ${name}`, () => {
-        const out = detectPlaintext(input)
-        expect(out.isPlaintext).to.equal(false)
-        expect(out.text).to.equal(undefined)
-      })
-    }
-  })
+    it('handles a fenced code block inside <pre>', () => {
+      const html = '<html><body><pre>```\ncode\nblock\n```</pre></body></html>'
+      const out = extractPlaintext(html)
+      expect(out).to.contain('```\ncode\nblock\n```')
+    })
 
-  describe('size guard', () => {
-    it('rejects bodies larger than the cap, regardless of contents', () => {
-      const big =
-        '<html><body><pre>' + 'a'.repeat(600 * 1024) + '</pre></body></html>'
-      const out = detectPlaintext(big)
-      expect(out.isPlaintext).to.equal(false)
+    it('collapses runs of 3+ newlines to exactly two', () => {
+      // Pathological input: many empty paragraphs back-to-back.
+      const html =
+        '<html><body><p>a</p><p></p><p></p><p></p><p>b</p></body></html>'
+      const out = extractPlaintext(html)
+      expect(out).to.match(/a\n\nb/)
+      expect(out).to.not.match(/\n\n\n/)
     })
   })
 })

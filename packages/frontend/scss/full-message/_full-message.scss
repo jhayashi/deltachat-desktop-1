@@ -50,15 +50,6 @@
   line-height: 1.5;
 }
 
-.full-message-iframe {
-  width: 100%;
-  // Height is content-driven via attribute on the iframe; the default
-  // here just keeps the layout stable before the doc loads.
-  min-height: 60vh;
-  border: 0;
-  background: white;
-}
-
 .full-message-loading,
 .full-message-error {
   max-width: 800px;

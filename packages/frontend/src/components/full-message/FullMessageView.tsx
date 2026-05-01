@@ -7,7 +7,7 @@ import {
 } from '../../utils/markdown/renderToReact'
 import { fullParser } from '../../utils/markdown/parser'
 import { parseElements } from '../../utils/linkify/parseElements'
-import { detectPlaintext } from './detectPlaintext'
+import { extractPlaintext } from './detectPlaintext'
 
 /**
  * Props handed off from the opener tab via localStorage. The new tab
@@ -28,9 +28,11 @@ export interface FullMessageViewProps {
 /**
  * Standalone viewer for the "Show Full Message…" tab in the browser
  * target. Mirrors what the Electron edition does in a separate
- * BrowserWindow: shows subject + sender + receive time, then the full
- * body. For wrapped-plaintext bodies we render through the markdown
- * pipeline; for rich HTML email bodies we use a sandboxed iframe.
+ * BrowserWindow: subject + sender + receive time, then the full body
+ * rendered through the markdown pipeline. We always treat the body
+ * as markdown — the deployment target is chat-with-Claude (and
+ * similar markdown-only senders), and HTML emails will still render
+ * legibly enough since `extractPlaintext` reduces any HTML to text.
  */
 export function FullMessageView({
   subject,
@@ -42,7 +44,7 @@ export function FullMessageView({
     document.title = subject || 'Full message'
   }, [subject])
 
-  const detection = detectPlaintext(html)
+  const text = extractPlaintext(html)
 
   return (
     <div className='full-message-view'>
@@ -54,11 +56,7 @@ export function FullMessageView({
         </div>
       </header>
       <main className='full-message-body'>
-        {detection.isPlaintext ? (
-          <PlaintextBody text={detection.text ?? ''} />
-        ) : (
-          <HtmlBody html={html} />
-        )}
+        <PlaintextBody text={text} />
       </main>
     </div>
   )
@@ -125,34 +123,5 @@ function PlaintextBody({ text }: { text: string }) {
     <div className='full-message-plaintext'>
       {renderMarkdown(text, fullParser, ctx, renderFullMessageLeaf)}
     </div>
-  )
-}
-
-/**
- * Render rich HTML email content in a sandboxed iframe. The CSP meta
- * tag injected at the top of the srcdoc blocks scripts, remote
- * stylesheets, and remote images — so a hostile email body cannot
- * fetch trackers or run JS. With `sandbox=""` (no allow-* tokens)
- * the iframe runs as a unique origin with scripts disabled.
- */
-function HtmlBody({ html }: { html: string }) {
-  const csp =
-    "default-src 'none'; " +
-    "style-src 'unsafe-inline'; " +
-    'img-src cid: data:; ' +
-    'font-src data:; ' +
-    "frame-ancestors 'none'; " +
-    "base-uri 'none'"
-  const srcdoc =
-    `<!doctype html><meta http-equiv="Content-Security-Policy" content="${csp}">` +
-    html
-
-  return (
-    <iframe
-      className='full-message-iframe'
-      sandbox=''
-      srcDoc={srcdoc}
-      title='Full message'
-    />
   )
 }
