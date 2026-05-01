@@ -5,8 +5,41 @@ import { countCall } from './debug-tools'
 
 export { T as Type } from '@deltachat/jsonrpc-client'
 
-export const BackendRemote: BaseDeltaChat<any> =
-  runtime.createDeltaChatConnection(countCall)
+/**
+ * Lazy-initialised JSON-RPC client. The connection (`/ws/dc` in the
+ * browser target, stdio in Electron/Tauri) is opened the first time
+ * any property is accessed — not at module load. This matters
+ * because `import {BackendRemote} from './backend-com'` is
+ * transitively pulled in by `App.tsx` and several system-integration
+ * modules, which are imported even on boot paths that don't actually
+ * use the chat backend (e.g. the standalone "show full message" tab
+ * in the browser target). Opening a second `/ws/dc` connection there
+ * would steal the chat tab's session — the browser server kicks the
+ * previously-active client.
+ *
+ * The Proxy is transparent to consumers — `BackendRemote.rpc` and
+ * `BackendRemote.on(...)` work exactly as before, just deferred to
+ * first call.
+ */
+let _backendRemoteImpl: BaseDeltaChat<any> | null = null
+function getBackendRemote(): BaseDeltaChat<any> {
+  if (_backendRemoteImpl === null) {
+    _backendRemoteImpl = runtime.createDeltaChatConnection(countCall)
+  }
+  return _backendRemoteImpl
+}
+export const BackendRemote: BaseDeltaChat<any> = new Proxy(
+  {} as BaseDeltaChat<any>,
+  {
+    get(_target, prop, _receiver) {
+      const real = getBackendRemote() as any
+      const value = real[prop]
+      // Bind methods so `this` resolves to the real instance even when
+      // a caller destructures (e.g. `const {rpc} = BackendRemote`).
+      return typeof value === 'function' ? value.bind(real) : value
+    },
+  }
+)
 
 /** Functions with side-effects */
 export namespace EffectfulBackendActions {
