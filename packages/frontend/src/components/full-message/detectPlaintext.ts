@@ -114,7 +114,43 @@ function extractPlaintextFromDom(html: string): string {
   // trailing whitespace. The walker emits paragraph breaks
   // generously, so this normalisation keeps the markdown source
   // tidy.
-  return text.replace(/\n{3,}/g, '\n\n').trim()
+  return joinTableRows(text.replace(/\n{3,}/g, '\n\n').trim())
+}
+
+/**
+ * Markdown tables require their header / separator / data rows to be on
+ * consecutive lines with no blank lines between them. When DC core
+ * wraps each line of the message in its own `<p>` (which our walker
+ * turns into `\n\n`-separated paragraphs), the table source is broken
+ * apart and markdown-it stops recognising it as a table.
+ *
+ * This pass finds blank lines that sit between two table-row-shaped
+ * lines and removes them, restoring the table structure. A
+ * "table-row-shaped" line starts and ends with `|` after trimming —
+ * this matches header rows, separator rows, and data rows. It can
+ * occasionally false-match a sentence ending in `|`, but for two such
+ * sentences to be adjacent in source is rare; the worst case there is
+ * losing one paragraph break.
+ */
+function joinTableRows(text: string): string {
+  const lines = text.split('\n')
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i]
+    if (cur.trim() === '' && i > 0 && i + 1 < lines.length) {
+      const prev = lines[i - 1].trim()
+      const next = lines[i + 1].trim()
+      if (isTableRow(prev) && isTableRow(next)) {
+        continue
+      }
+    }
+    out.push(cur)
+  }
+  return out.join('\n')
+}
+
+function isTableRow(line: string): boolean {
+  return line.length >= 2 && line.startsWith('|') && line.endsWith('|')
 }
 
 /**
@@ -142,9 +178,11 @@ function extractPlaintextWithRegex(html: string): string {
   // Strip remaining tags.
   s = s.replace(/<\/?[a-zA-Z!][^>]*>/g, '')
   // Decode entities, normalise whitespace.
-  return decodeEntities(s)
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  return joinTableRows(
+    decodeEntities(s)
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  )
 }
 
 /**

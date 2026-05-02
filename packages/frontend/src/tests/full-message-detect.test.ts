@@ -103,5 +103,36 @@ describe('extractPlaintext (regex fallback path)', () => {
       expect(out).to.match(/a\n\nb/)
       expect(out).to.not.match(/\n\n\n/)
     })
+
+    it('rejoins table rows that DC core wrapped per-line in <p>', () => {
+      // DC core wraps each line of the source in its own <p>, which
+      // our walker turns into \n\n between rows. The post-pass must
+      // restore the consecutive-line layout markdown-it requires.
+      const html =
+        '<html><body>' +
+        '<p>| h1 | h2 |</p>' +
+        '<p>|----|----|</p>' +
+        '<p>| a  | b  |</p>' +
+        '</body></html>'
+      const out = extractPlaintext(html)
+      expect(out).to.equal('| h1 | h2 |\n|----|----|\n| a  | b  |')
+    })
+
+    it('preserves paragraph break before and after a table block', () => {
+      // The table rows should collapse to single \n between them, but
+      // the surrounding paragraphs should still get their \n\n.
+      const html =
+        '<html><body>' +
+        '<p>before</p>' +
+        '<p>| a | b |</p>' +
+        '<p>|---|---|</p>' +
+        '<p>| 1 | 2 |</p>' +
+        '<p>after</p>' +
+        '</body></html>'
+      const out = extractPlaintext(html)
+      expect(out).to.equal(
+        'before\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nafter'
+      )
+    })
   })
 })
