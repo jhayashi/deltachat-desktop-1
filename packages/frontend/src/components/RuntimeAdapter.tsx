@@ -4,6 +4,7 @@ import useMessage from '../hooks/chat/useMessage'
 import useProcessQr from '../hooks/useProcessQr'
 import { clearNotificationsForChat } from '../system-integration/notifications'
 import { runtime } from '@deltachat-desktop/runtime-interface'
+import { BackendRemote } from '../backend-com'
 
 import type { PropsWithChildren } from 'react'
 import { ActionEmitter, KeybindAction } from '../keybindings'
@@ -102,6 +103,34 @@ export default function RuntimeAdapter({
       })
     }
   }, [closeDialog, openDialog, accountId])
+
+  useEffect(() => {
+    runtime.onWebxdcRpc = async (method, accountId, msgId, payload) => {
+      const rpc = BackendRemote.rpc
+      switch (method) {
+        case 'getWebxdcStatusUpdates':
+          return rpc.getWebxdcStatusUpdates(accountId, msgId, payload ?? 0)
+        case 'sendWebxdcStatusUpdate':
+          return rpc.sendWebxdcStatusUpdate(
+            accountId,
+            msgId,
+            JSON.stringify(payload),
+            ''
+          )
+        case 'sendWebxdcRealtimeAdvertisement':
+          return rpc.sendWebxdcRealtimeAdvertisement(accountId, msgId)
+        case 'sendWebxdcRealtimeData':
+          return rpc.sendWebxdcRealtimeData(accountId, msgId, payload)
+        case 'leaveWebxdcRealtime':
+          return rpc.leaveWebxdcRealtime(accountId, msgId)
+        default:
+          console.error('Unknown webxdc RPC method:', method)
+      }
+    }
+    return () => {
+      runtime.onWebxdcRpc = undefined
+    }
+  }, [])
 
   useEffect(() => {
     runtime.onToggleNotifications = () => {

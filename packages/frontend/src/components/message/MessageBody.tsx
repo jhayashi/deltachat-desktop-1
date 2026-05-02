@@ -2,6 +2,7 @@ import React from 'react'
 import classNames from 'classnames'
 import { parseAndRenderMessage } from './MessageParser'
 import * as linkify from 'linkifyjs'
+import { useDesktopBoolSetting } from '../../stores/settings'
 
 /** limit where message parser will not parse the message, limit of core is lower, this is just a failsafe */
 const UPPER_LIMIT_FOR_PARSED_MESSAGES = 20_000
@@ -79,6 +80,10 @@ function MessageBody({
    */
   tabindexForInteractiveContents?: -1 | 0
 }): React.ReactElement {
+  // Read the markdown toggle via a value-equality selector so this
+  // React.memo'd leaf only re-renders when the boolean actually flips —
+  // not on every unrelated settings change. See `useDesktopBoolSetting`.
+  const markdownEnabled = useDesktopBoolSetting('messageMarkdownEnabled', true)
   if (text.length >= UPPER_LIMIT_FOR_PARSED_MESSAGES) {
     return <>{text}</>
   }
@@ -94,10 +99,19 @@ function MessageBody({
       )
     }
   }
+  // Quotes (nonInteractiveContent=true) historically used the preview
+  // short-circuit and rendered raw text. With this change they go through
+  // the parsed path so markdown formatting can render, with linkify and
+  // bot-commands still disabled (suppressLinkify) — matches the prior
+  // "non-interactive" expectation while letting **bold** show as bold.
   return parseAndRenderMessage(
     textTrimmed,
-    nonInteractiveContent,
-    tabindexForInteractiveContents ?? 0
+    false,
+    tabindexForInteractiveContents ?? 0,
+    {
+      markdownEnabled,
+      nonInteractive: nonInteractiveContent,
+    }
   )
 }
 const trimRegex = /^[\s\uFEFF\xA0\n\t]+|[\s\uFEFF\xA0\n\t]+$/g

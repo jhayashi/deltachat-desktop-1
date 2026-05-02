@@ -1,44 +1,64 @@
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-Regular.ttf") format("truetype");
+  font-display: swap;
 }
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-Italic.ttf") format("truetype");
   font-style: italic;
+  font-display: swap;
 }
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-Medium.ttf") format("truetype");
   font-weight: 300;
+  font-display: swap;
 }
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-MediumItalic.ttf") format("truetype");
   font-style: italic;
   font-weight: 300;
+  font-display: swap;
 }
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-Bold.ttf") format("truetype");
   font-weight: bold;
+  font-display: swap;
 }
 @font-face {
   font-family: "Roboto";
   src: url("Roboto-BoldItalic.ttf") format("truetype");
   font-style: italic;
   font-weight: bold;
+  font-display: swap;
 }
 @font-face {
   font-family: "NotoMono";
   src: url("noto/mono/NotoMono-Regular.ttf") format("truetype");
+  font-display: swap;
 }
 @font-face {
   font-family: "NotoEmoji";
   src: url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
+  font-display: swap;
+}
+/* Modern COLRv1 vector version of Noto Color Emoji from Google Fonts.
+   The bundled `noto/emoji/NotoColorEmoji.ttf` above is the older
+   CBDT bitmap version from 2022 — kept as a fallback in case the
+   COLRv1 version doesn't load for some reason. */
+@font-face {
+  font-family: "Noto Color Emoji";
+  src: url("noto-color-emoji/NotoColorEmoji.ttf") format("truetype");
+  font-display: swap;
 }
 /* make emoji mart use the same emoji fonts in the same order that we use elsewhere */
 @font-face {
   font-family: 'EmojiMart';
-  src: local('Apple Color Emoji'), url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
+  src: local('Apple Color Emoji'),
+       url("noto-color-emoji/NotoColorEmoji.ttf") format("truetype"),
+       url("noto/emoji/NotoColorEmoji.ttf") format("truetype");
+  font-display: swap;
 }

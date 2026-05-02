@@ -38,6 +38,18 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Rework message info ([#6156](https://github.com/deltachat/deltachat-desktop/issues/6156))
+- Render markdown formatting in messages: bold, italic, strikethrough,
+  inline and fenced code, and tables. Toggle in Settings → Chats and Media
+  (default on). Restores experimental markdown support that was dropped in
+  [#5502](https://github.com/deltachat/deltachat-desktop/issues/5502) when
+  the parser switched to linkifyjs, and adds GFM tables. Note: other Delta
+  Chat clients (iOS, official Android) do not currently render markdown —
+  recipients there will see the raw markup.
+- Browser target: "Show Full Message…" now opens the full message in a new
+  tab. Plaintext messages truncated by Delta Chat core render through the
+  markdown pipeline; HTML email bodies render in a sandboxed iframe with a
+  strict Content Security Policy. Previously this button threw an error
+  in the browser edition.
 
 ### Miscellaneous Tasks
 

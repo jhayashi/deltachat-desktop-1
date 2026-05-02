@@ -6,6 +6,11 @@ import '../../utils/linkify/plugin-bot-command/index.js'
 
 import { Link } from './Link.js'
 import { parseElements } from '../../utils/linkify/parseElements.js'
+import { fullParser, inlineParser } from '../../utils/markdown/parser'
+import {
+  renderMarkdown,
+  TextLeafCtx as RenderToReactCtx,
+} from '../../utils/markdown/renderToReact'
 import { getLogger } from '@deltachat-desktop/shared/logger'
 import { ActionEmitter, KeybindAction } from '../../keybindings'
 import { BackendRemote } from '../../backend-com'
@@ -20,7 +25,7 @@ const log = getLogger('renderer/message-parser')
 function renderElement(
   elm: linkify.MultiToken,
   tabindexForInteractiveContents: -1 | 0,
-  key?: number
+  key: string | number
 ): React.ReactElement {
   switch (elm.t) {
     case 'hashtag':
@@ -120,12 +125,58 @@ function renderElement(
 }
 
 /**
+ * Re-export of {@link RenderToReactCtx} so existing callers (MessageBody,
+ * etc.) keep importing `TextLeafCtx` from here. Owns no extra fields —
+ * the walker is the source of truth.
+ */
+export type TextLeafCtx = RenderToReactCtx
+
+/**
+ * Convert a flat text run into React nodes via linkify.
+ *
+ * Used by both:
+ *   - {@link parseAndRenderMessage} for the entire message body
+ *   - the markdown walker, called once per markdown text leaf so that URLs,
+ *     emails, hashtags and (top-level) bot commands keep working inside
+ *     formatted text.
+ *
+ * `parentKey` is prefixed to every emitted node's React key so keys remain
+ * stable and unique across nested walker output.
+ */
+export function renderTextLeaf(
+  text: string,
+  ctx: TextLeafCtx,
+  parentKey: string | number = ''
+): React.ReactNode[] {
+  if (ctx.suppressLinkify) {
+    return [<span key={`${parentKey}t0`}>{text}</span>]
+  }
+  const elements = parseElements(text, {
+    suppressBotCommands: ctx.suppressBotCommands,
+  })
+  return elements.map((el, index) =>
+    renderElement(el, ctx.tabindex, `${parentKey}t${index}`)
+  )
+}
+
+export interface ParseAndRenderMessageOptions {
+  /** When true, run the markdown parser before linkify on text leaves. */
+  markdownEnabled?: boolean
+  /**
+   * When true, render text leaves as plain spans — no linkify, no
+   * bot-command suggestions. Used for quotes, which historically rendered
+   * raw text. With markdown enabled, the formatting is applied but URL /
+   * bot-command interactivity stays off (matches the prior expectation).
+   */
+  nonInteractive?: boolean
+}
+
+/**
  * parse message text (for links and interactive elements)
  * and render as React elements
  *
- * @param preview - render in preview mode for ChatListItem summary
- * and for quoted messages, without interactive elements
- * (links can not be clicked etc.)
+ * @param preview - render in preview mode for ChatListItem summary,
+ * without interactive elements and without parsing.
  */
 export function parseAndRenderMessage(
   message: string,
@@ -134,20 +185,27 @@ export function parseAndRenderMessage(
    * Has no effect if `{@link preview} === true`, because there should be
    * no interactive elements in the first place
    */
-  tabindexForInteractiveContents: -1 | 0
+  tabindexForInteractiveContents: -1 | 0,
+  options: ParseAndRenderMessageOptions = {}
 ): React.ReactElement {
   if (preview) {
     return <div className='truncated'>{message}</div>
   }
+  const ctx: TextLeafCtx = {
+    tabindex: tabindexForInteractiveContents,
+    suppressLinkify: !!options.nonInteractive,
+  }
   try {
-    const elements = parseElements(message)
-    return (
-      <>
-        {elements.map((el, index) =>
-          renderElement(el, tabindexForInteractiveContents, index)
-        )}
-      </>
-    )
+    if (options.markdownEnabled) {
+      // Quotes are rendered in a `-webkit-line-clamp` flex container —
+      // block-level children (<pre>, <table>) break the clamp model and
+      // visually blow out the bubble. Use the inline-only parser there
+      // so quotes can still show **bold** / *italic* / `code` formatting
+      // without dragging in fenced code or tables.
+      const parser = options.nonInteractive ? inlineParser : fullParser
+      return <>{renderMarkdown(message, parser, ctx, renderTextLeaf)}</>
+    }
+    return <>{renderTextLeaf(message, ctx)}</>
   } catch (error) {
     log.error('parseAndRenderMessage failed:', { input: message, error })
     return <>{message}</>

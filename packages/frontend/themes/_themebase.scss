@@ -226,6 +226,16 @@ $scrollbarTransparency: 0.34 !default;
     #{colorToRGB(changeContrast($bgSecondary, 8%))}
   );
 
+  /** Markdown rendering — code blocks, inline code, tables.
+   *  Derived from $bgPrimary so every theme gets sane values without
+   *  per-theme overrides. Themes that want bespoke shades can set these
+   *  vars directly. */
+  --codeBlockBg: #{changeContrast($bgPrimary, 8%)};
+  --codeBlockFg: #{$textPrimary};
+  --codeBlockBorder: #{changeContrast($bgPrimary, 20%)};
+  --inlineCodeBg: #{changeContrast($bgPrimary, 6%)};
+  --inlineCodeFg: #{$textPrimary};
+
   /** HTML Email Window */
   --htmlEmail-themeDarkOrLight: #{$themeDarkOrLight};
   --htmlEmail-background: #{$bgPrimary};

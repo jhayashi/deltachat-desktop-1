@@ -195,6 +195,7 @@ class TauriRuntime implements Runtime {
       isMentionsEnabled: false,
       inChatSoundsVolume: 0.5,
       useSystemUIFont: false,
+      messageMarkdownEnabled: true,
     } satisfies Partial<DesktopSettingsType>
 
     const savedEntries = (await this.store.entries()).reduce(
@@ -717,6 +718,14 @@ class TauriRuntime implements Runtime {
         text: string | null,
         account_id?: number
       ) => void)
+    | undefined
+  onWebxdcRpc:
+    | ((
+        method: string,
+        accountId: number,
+        msgId: number,
+        payload?: any
+      ) => Promise<any>)
     | undefined
   onResumeFromSleep: (() => void) | undefined
   onToggleNotifications: (() => void) | undefined

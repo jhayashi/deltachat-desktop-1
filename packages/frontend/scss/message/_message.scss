@@ -19,7 +19,11 @@ $info-text-max-width: 400px;
   display: inline-flex;
   flex-direction: row;
   align-items: stretch;
-  max-width: 75%;
+  // Wider cap than the historical 75% so markdown tables and longer
+  // text bodies have room to breathe. Single-line replies still grow
+  // only to their content width — `inline-flex` keeps the bubble
+  // content-driven; this is just the upper bound.
+  max-width: 90%;
 
   & > .author-avatar {
     @include mixins.button-reset;

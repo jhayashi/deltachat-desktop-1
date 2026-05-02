@@ -210,6 +210,14 @@ export interface Runtime {
         account?: number
       ) => void)
     | undefined
+  onWebxdcRpc:
+    | ((
+        method: string,
+        accountId: number,
+        msgId: number,
+        payload?: any
+      ) => Promise<any>)
+    | undefined
   onResumeFromSleep: (() => void) | undefined
   onToggleNotifications: (() => void) | undefined
 

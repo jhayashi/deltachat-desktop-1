@@ -1,3 +1,4 @@
+import { useCallback, useSyncExternalStore } from 'react'
 import { C } from '@deltachat/jsonrpc-client'
 import { DesktopSettingsType, RC_Config } from '../../../shared/shared-types'
 import { BackendRemote, Type } from '../backend-com'
@@ -5,6 +6,7 @@ import { onReady } from '../onready'
 import { runtime } from '@deltachat-desktop/runtime-interface'
 import { Store, useStore } from './store'
 import { throttledUpdateBadgeCounter } from '../system-integration/badge-counter'
+import { migrateLegacyMarkdownSetting } from './settings-migrations'
 
 export interface SettingsStoreState {
   accountId: number
@@ -140,6 +142,11 @@ class SettingsStore extends Store<SettingsStoreState | null> {
         settings['ui.mentions_enabled'] = mentionsEnabledDefaultVal
       }
 
+      await migrateLegacyMarkdownSetting(
+        desktopSettings,
+        runtime.setDesktopSetting.bind(runtime)
+      )
+
       const rc = runtime.getRC_Config()
       this.reducer.setState({
         settings,
@@ -177,6 +184,19 @@ class SettingsStore extends Store<SettingsStoreState | null> {
       value: string | number | boolean
     ) => {
       try {
+        if (key === 'messageMarkdownEnabled') {
+          // Clear the legacy key BEFORE saving the new one. If the second
+          // write fails (IPC drop on shutdown, etc.), we want the failure
+          // mode to be "user's just-toggled preference didn't persist"
+          // (recoverable: they re-toggle next launch) rather than
+          // "preference saved, legacy still set" (unrecoverable: next
+          // launch's migration overwrites the new value with the stale
+          // legacy one). See settings-migrations.ts.
+          await runtime.setDesktopSetting(
+            'experimentalEnableMarkdownInMessages',
+            undefined
+          )
+        }
         await runtime.setDesktopSetting(key, value)
         if (key === 'syncAllAccounts') {
           if (value) {
@@ -239,5 +259,44 @@ onReady(() => {
 
 const SettingsStoreInstance = new SettingsStore(null, 'SettingsStore')
 export const useSettingsStore = () => useStore(SettingsStoreInstance)
+
+/**
+ * Module-scope subscribe wrapper so its identity is stable across
+ * renders. `useSyncExternalStore` keys its subscription on this
+ * function's reference; recreating it per-render would unsubscribe and
+ * resubscribe every time, churning the store's listener array
+ * (`Store.unsubscribe` does an `indexOf` + `splice`).
+ */
+const subscribeToSettingsStore = (cb: () => void) =>
+  SettingsStoreInstance.subscribe(cb)
+
+/**
+ * Subscribe to a single boolean desktop-setting via {@link useSyncExternalStore}.
+ *
+ * Why not `useSettingsStore()`: `useStore` re-renders the consumer on every
+ * store change. Any settings page toggle, theme switch, or notification
+ * volume change would re-render every visible message bubble. This selector
+ * variant only re-renders when the selected boolean actually flips.
+ *
+ * The default applies before settings have loaded (boot-time) so callers
+ * never observe `undefined`.
+ */
+export function useDesktopBoolSetting(
+  key: keyof DesktopSettingsType,
+  fallback: boolean
+): boolean {
+  // Snapshot is memoized on (key, fallback) so successive renders pass
+  // the same reference — useSyncExternalStore reads the snapshot on every
+  // render, but a stable function avoids forcing extra reconciliation.
+  const getSnapshot = useCallback(() => {
+    const v = SettingsStoreInstance.getState()?.desktopSettings[key]
+    return typeof v === 'boolean' ? v : fallback
+  }, [key, fallback])
+  return useSyncExternalStore(
+    subscribeToSettingsStore,
+    getSnapshot,
+    getSnapshot
+  )
+}
 
 export default SettingsStoreInstance

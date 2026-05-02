@@ -1,0 +1,63 @@
+// Standalone "Show Full Message…" tab — the browser-target equivalent
+// of Electron's separate BrowserWindow. Class names are global on
+// purpose to match the `mm-` markdown convention and to let custom
+// themes target them predictably.
+
+.full-message-view {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  color: var(--textPrimary);
+  background: var(--bgPrimary);
+  min-height: 100vh;
+  box-sizing: border-box;
+  font-family: var(--fonts-default);
+}
+
+.full-message-header {
+  border-block-end: 1px solid var(--codeBlockBorder);
+  margin-block-end: 16px;
+  padding-block-end: 12px;
+}
+
+.full-message-subject {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  word-break: break-word;
+}
+
+.full-message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9em;
+  color: var(--textSecondary);
+}
+
+.full-message-sender {
+  font-weight: 500;
+}
+
+.full-message-body {
+  // Inherit body font-size; `.mm-*` markdown classes already apply.
+}
+
+.full-message-plaintext {
+  // Word-wrap long unbroken sequences (URLs, code) so the column stays
+  // readable even when the source text has none of its own breaks.
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.full-message-loading,
+.full-message-error {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  color: var(--textPrimary);
+}
+
+.full-message-error {
+  color: var(--colorDanger);
+}
